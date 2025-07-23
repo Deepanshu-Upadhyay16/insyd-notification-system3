@@ -27,8 +27,8 @@ export interface Notification {
   user_id: string
   type: "follow" | "post" | "like" | "comment"
   message: string
-  related_user_id?: string
-  related_post_id?: string
+  related_user_id?: string | null
+  related_post_id?: string | null
   is_read: boolean
   created_at: Date
 }
@@ -213,8 +213,8 @@ export class DatabaseManager {
         notification.user_id,
         notification.type,
         notification.message,
-        notification.related_user_id,
-        notification.related_post_id,
+        notification.related_user_id || null,
+        notification.related_post_id || null,
         notification.is_read,
       ],
     )

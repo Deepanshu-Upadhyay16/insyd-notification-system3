@@ -18,7 +18,7 @@ export class NotificationService {
       type: "follow",
       message: `${follower.username} started following you`,
       related_user_id: followerId,
-      related_post_id: null,
+      related_post_id: undefined,
       is_read: false,
     }
 
