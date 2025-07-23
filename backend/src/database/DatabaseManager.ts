@@ -37,15 +37,20 @@ export class DatabaseManager {
   private pool: Pool
 
   constructor() {
-    this.pool = mysql.createPool({
-      host: process.env.DB_HOST || "localhost",
-      user: process.env.DB_USER || "root",
-      password: process.env.DB_PASSWORD || "",
-      database: process.env.DB_NAME || "insyd_notifications",
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-    })
+    // Handle Railway's DATABASE_URL format
+    if (process.env.DATABASE_URL) {
+      this.pool = mysql.createPool(process.env.DATABASE_URL)
+    } else {
+      this.pool = mysql.createPool({
+        host: process.env.DB_HOST || "localhost",
+        user: process.env.DB_USER || "root",
+        password: process.env.DB_PASSWORD || "",
+        database: process.env.DB_NAME || "insyd_notifications",
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
+      })
+    }
   }
 
   async initialize() {
