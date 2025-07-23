@@ -37,31 +37,82 @@ export class DatabaseManager {
   private pool: Pool
 
   constructor() {
+    console.log("🔍 Checking database configuration...")
+    console.log("DATABASE_URL exists:", !!process.env.DATABASE_URL)
+    console.log("DB_HOST:", process.env.DB_HOST)
+    console.log("DB_USER:", process.env.DB_USER)
+    console.log("DB_NAME:", process.env.DB_NAME)
+
     // Handle Railway's DATABASE_URL format
     if (process.env.DATABASE_URL) {
-      this.pool = mysql.createPool(process.env.DATABASE_URL)
-    } else {
+      console.log("📡 Using DATABASE_URL for connection")
       this.pool = mysql.createPool({
+        uri: process.env.DATABASE_URL,
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
+        acquireTimeout: 60000,
+        timeout: 60000,
+      })
+    } else {
+      console.log("🔧 Using individual DB environment variables")
+      const config = {
         host: process.env.DB_HOST || "localhost",
         user: process.env.DB_USER || "root",
         password: process.env.DB_PASSWORD || "",
         database: process.env.DB_NAME || "insyd_notifications",
+        port: Number.parseInt(process.env.DB_PORT || "3306"),
         waitForConnections: true,
         connectionLimit: 10,
         queueLimit: 0,
+        acquireTimeout: 60000,
+        timeout: 60000,
+      }
+
+      console.log("Database config:", {
+        ...config,
+        password: config.password ? "[HIDDEN]" : "[EMPTY]",
       })
+
+      this.pool = mysql.createPool(config)
     }
   }
 
   async initialize() {
-    await this.createTables()
-    await this.seedData()
+    console.log("🚀 Initializing database...")
+
+    try {
+      // Test connection first
+      await this.testConnection()
+      console.log("✅ Database connection successful")
+
+      await this.createTables()
+      console.log("✅ Database tables created")
+
+      await this.seedData()
+      console.log("✅ Database seeded")
+    } catch (error) {
+      console.error("❌ Database initialization failed:", error)
+      throw error
+    }
+  }
+
+  private async testConnection(): Promise<void> {
+    const connection = await this.pool.getConnection()
+    try {
+      await connection.execute("SELECT 1")
+      console.log("🔗 Database connection test passed")
+    } finally {
+      connection.release()
+    }
   }
 
   private async createTables() {
     const connection = await this.pool.getConnection()
 
     try {
+      console.log("📋 Creating database tables...")
+
       // Create users table
       await connection.execute(`
         CREATE TABLE IF NOT EXISTS users (
@@ -72,6 +123,7 @@ export class DatabaseManager {
           INDEX idx_username (username)
         )
       `)
+      console.log("✅ Users table created")
 
       // Create posts table
       await connection.execute(`
@@ -85,6 +137,7 @@ export class DatabaseManager {
           INDEX idx_user_created (user_id, created_at)
         )
       `)
+      console.log("✅ Posts table created")
 
       // Create follows table
       await connection.execute(`
@@ -97,6 +150,7 @@ export class DatabaseManager {
           FOREIGN KEY (following_id) REFERENCES users(id) ON DELETE CASCADE
         )
       `)
+      console.log("✅ Follows table created")
 
       // Create notifications table
       await connection.execute(`
@@ -114,8 +168,7 @@ export class DatabaseManager {
           INDEX idx_user_unread (user_id, is_read)
         )
       `)
-
-      console.log("Database tables created successfully")
+      console.log("✅ Notifications table created")
     } finally {
       connection.release()
     }
@@ -128,9 +181,11 @@ export class DatabaseManager {
       // Check if users already exist
       const [existingUsers] = await connection.execute("SELECT COUNT(*) as count FROM users")
       if ((existingUsers as any)[0].count > 0) {
-        console.log("Database already seeded")
+        console.log("📊 Database already seeded, skipping...")
         return
       }
+
+      console.log("🌱 Seeding database with initial data...")
 
       // Seed users
       const users = [
@@ -147,13 +202,13 @@ export class DatabaseManager {
           user.email,
         ])
       }
+      console.log("👥 Users seeded")
 
       // Seed some follows
       await connection.execute("INSERT INTO follows (follower_id, following_id) VALUES (?, ?)", ["1", "2"])
       await connection.execute("INSERT INTO follows (follower_id, following_id) VALUES (?, ?)", ["1", "3"])
       await connection.execute("INSERT INTO follows (follower_id, following_id) VALUES (?, ?)", ["2", "1"])
-
-      console.log("Database seeded successfully")
+      console.log("🔗 Follow relationships seeded")
     } finally {
       connection.release()
     }
